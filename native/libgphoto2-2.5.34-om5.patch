@@ -1,0 +1,127 @@
+--- a/camlibs/ptp2/library.c
++++ b/camlibs/ptp2/library.c
+@@ -1960,6 +1960,7 @@
+ 	{"Olympus:OM-1",  	  	  0x07b4, 0x0136, PTP_CAP|PTP_CAP_PREVIEW},
+ 	/* Louie Lu <git@louie.lu> */
+ 	{"Olympus:OM-1MarkII",        0x33a2, 0x0136, PTP_CAP|PTP_CAP_PREVIEW},
++	{"OM System:OM-5 (USB Remote)", 0x33a2, 0x0138, PTP_CAP},
+ 
+ 	/* IRC report */
+ 	{"Casio:EX-Z120",                 0x07cf, 0x1042, 0},
+@@ -5623,6 +5624,97 @@
+ 	return GP_ERROR;
+ }
+ 
++/* The original OM-5 has separate press and release phases. A failed
++ * transaction can follow a successful shutter action. Never retry a press. */
++static int
++is_om5_remote (Camera *camera)
++{
++	CameraAbilities a;
++	PTPParams *params = &camera->pl->params;
++	return gp_camera_get_abilities (camera, &a) == GP_OK &&
++		a.usb_vendor == 0x33a2 && a.usb_product == 0x0138 &&
++		params->deviceinfo.Model && !strcmp (params->deviceinfo.Model, "OM-5") &&
++		ptp_operation_issupported (params, PTP_OC_OLYMPUS_OMD_Capture);
++}
++
++static uint16_t
++om5_release_once (PTPParams *params)
++{
++	uint16_t rc, up, off;
++	rc = ptp_generic_no_data (params, PTP_OC_OLYMPUS_OMD_Capture, 1, 1);
++	if (rc == PTP_RC_OK) {
++		usleep (600000);
++		rc = ptp_generic_no_data (params, PTP_OC_OLYMPUS_OMD_Capture, 1, 2);
++		usleep (120000);
++	}
++	up = ptp_generic_no_data (params, PTP_OC_OLYMPUS_OMD_Capture, 1, 4);
++	off = ptp_generic_no_data (params, PTP_OC_OLYMPUS_OMD_Capture, 1, 5);
++	if (rc != PTP_RC_OK) return rc;
++	return up == PTP_RC_OK ? off : up;
++}
++
++static int
++om5_handle_order (const void *a, const void *b)
++{
++	uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)b;
++	return (x > y) - (x < y);
++}
++
++static int
++om5_capture_image (Camera *camera, CameraFilePath *path, GPContext *context)
++{
++	PTPParams *params = &camera->pl->params;
++	PTPObjectHandles before = {0}, now = {0};
++	PTPPropValue original, sd = {0}, actual;
++	struct timeval start;
++	int rc = GP_ERROR_TIMEOUT, delay = 0;
++	uint16_t ptprc;
++	sd.u16 = 2;
++	ptprc = ptp_getdevicepropvalue (params, PTP_DPC_OLYMPUS_CaptureTarget, &original, PTP_DTC_UINT16);
++	if (ptprc != PTP_RC_OK) return translate_ptp_result (ptprc);
++	if (original.u16 != sd.u16) {
++		ptprc = ptp_setdevicepropvalue (params, PTP_DPC_OLYMPUS_CaptureTarget, &sd, PTP_DTC_UINT16);
++		if (ptprc != PTP_RC_OK) goto done;
++		ptprc = ptp_getdevicepropvalue (params, PTP_DPC_OLYMPUS_CaptureTarget, &actual, PTP_DTC_UINT16);
++		if (ptprc != PTP_RC_OK) goto done;
++		if (actual.u16 != sd.u16) { rc = GP_ERROR_CAMERA_BUSY; goto done; }
++	}
++	ptprc = ptp_getobjecthandles (params, PTP_HANDLER_SPECIAL, 0, 0, &before);
++	if (ptprc != PTP_RC_OK) goto done;
++	if (before.len) qsort (before.val, before.len, sizeof (uint32_t), om5_handle_order);
++	ptprc = om5_release_once (params);
++	if (ptprc != PTP_RC_OK) goto done;
++	start = time_now();
++	do {
++		unsigned int i;
++		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) { rc = GP_ERROR_CANCEL; break; }
++		ptprc = ptp_getobjecthandles (params, PTP_HANDLER_SPECIAL, 0, 0, &now);
++		if (ptprc != PTP_RC_OK && ptprc != PTP_RC_DeviceBusy) goto done;
++		for (i = 0; ptprc == PTP_RC_OK && i < now.len; i++) {
++			uint32_t handle = now.val[i];
++			PTPObject *object;
++			if (before.len && bsearch (&handle, before.val, before.len, sizeof (handle), om5_handle_order))
++				continue;
++			uint16_t info = ptp_object_want (params, handle, PTPOBJECT_OBJECTINFO_LOADED, &object);
++			if (info == PTP_RC_DeviceBusy || info == PTP_RC_InvalidObjectHandle) continue;
++			if (info != PTP_RC_OK) { ptprc = info; goto done; }
++			if (object->oi.ObjectFormat == PTP_OFC_Association || !object->oi.ObjectSize) continue;
++			rc = add_object_to_fs_and_path (camera, handle, path, context);
++			goto done;
++		}
++		free_array (&now);
++		ptprc = PTP_RC_OK;
++	} while (waiting_for_timeout (&delay, start, 65000));
++done:
++	free_array (&now);
++	free_array (&before);
++	if (original.u16 != sd.u16) {
++		uint16_t restore = ptp_setdevicepropvalue (params, PTP_DPC_OLYMPUS_CaptureTarget, &original, PTP_DTC_UINT16);
++		if (restore != PTP_RC_OK && ptprc == PTP_RC_OK) ptprc = restore;
++	}
++	return ptprc == PTP_RC_OK ? rc : translate_ptp_result (ptprc);
++}
++
+ static int
+ camera_olympus_omd_capture (Camera *camera, CameraCaptureType type, CameraFilePath *path, GPContext *context)
+ {
+@@ -5830,6 +5922,9 @@
+ 			 return ret;
+ 		/* for CARD capture and unsupported combinations, fall through */
+ 	}
++
++	if (is_om5_remote (camera))
++		return om5_capture_image (camera, path, context);
+ 
+ 	if (params->deviceinfo.VendorExtensionID == PTP_VENDOR_GP_OLYMPUS_OMD)
+ 		return camera_olympus_omd_capture (camera, type, path, context);
+@@ -6632,6 +6727,8 @@
+ 	if (	(params->deviceinfo.VendorExtensionID == PTP_VENDOR_GP_OLYMPUS_OMD) &&
+ 		ptp_operation_issupported(params, PTP_OC_OLYMPUS_OMD_Capture)
+ 	) {
++		if (is_om5_remote (camera))
++			return translate_ptp_result (om5_release_once (params));
+ 		C_PTP_REP(ptp_generic_no_data(params, PTP_OC_OLYMPUS_OMD_Capture, 1, 0x3));
+ 		C_PTP_REP(ptp_generic_no_data(params, PTP_OC_OLYMPUS_OMD_Capture, 1, 0x6));
+ 		return GP_OK;

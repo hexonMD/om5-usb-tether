@@ -12,11 +12,13 @@ Capture photographs from the original OM SYSTEM OM-5 over USB and process focus 
 | Focus stacking | Windows bridge retrieved a bracket and the camera's composite | Offline stacking of aligned JPEGs available |
 | Lightroom Classic plug-in | Bridge tested with the camera. Import inside Lightroom still needs a catalog test | Plug-in uses gPhoto2 for live capture and needs a capture-capable driver. OM-5 hardware test pending |
 | Lightroom Classic's Start Tethered Capture | Native camera integration unresolved | Same |
-| darktable tethering | Native libgphoto2 integration under development | Same |
+| darktable tethering | Experimental libgphoto2 patch registers the camera. App capture pending | Same |
 | OM Capture | Physical application test pending | Same |
 | Video | Studio processes supplied video files | Same |
 
 The tested camera exposed USB Remote with USB ID `33a2:0138` after a stock settings restore. Ordinary MTP uses `33a2:012f`. The tested body retained its stock firmware.
+
+Developers testing darktable can build the experimental PTP driver in a separate directory. The driver passed a Linux build and registry check for the Remote USB ID and capture capability. [Native driver experiment](native/README.md)
 
 ## Set up the laptop
 
@@ -62,4 +64,4 @@ Adobe's published tether list and OM Capture's compatibility list omit the origi
 
 Include your OS, app version, original OM-5 body firmware, USB mode, and whether the app discovered the body, fired the shutter, and downloaded a full-resolution file. Report each step individually. Redact device serials and pairing details from diagnostics. Run `python -m unittest discover -v` for offline regression tests.
 
-Original project code is available under the [MIT license](LICENSE). Files marked 0BSD retain their existing license.
+Original project code is available under the [MIT license](LICENSE). Files marked 0BSD retain their existing license. The libgphoto2 patch follows upstream's LGPL-2.0-or-later license.

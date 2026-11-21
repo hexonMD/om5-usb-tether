@@ -18,3 +18,25 @@ jobs:
       - run: python -m unittest discover -v
       - run: python generate_samples.py
       - run: python jewelry_studio.py sample --output results
+  mac-driver:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install pkgconf libtool libusb
+      - name: Build the patched PTP driver and verify the USB model registry
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error -o libgphoto.tar.xz https://github.com/gphoto/libgphoto2/releases/download/v2.5.34/libgphoto2-2.5.34.tar.xz
+          echo '51993f5d9bfb6b4e5925cbbe5883085791bff6f81bcacb8ffe1b783ce76d586a  libgphoto.tar.xz' | shasum -a 256 -c -
+          tar xf libgphoto.tar.xz
+          cd libgphoto2-2.5.34
+          git apply "$GITHUB_WORKSPACE/native/libgphoto2-2.5.34-om5.patch"
+          prefix="$RUNNER_TEMP/om5-install"
+          ltdl="$(brew --prefix libtool)"
+          CPPFLAGS="-I$ltdl/include" LDFLAGS="-L$ltdl/lib" ./configure --prefix="$prefix" --with-camlibs=ptp2 --disable-nls
+          make -j3
+          make install
+          cc -I"$prefix/include" "$GITHUB_WORKSPACE/native/check_abilities.c" -L"$prefix/lib" -lgphoto2 -o check-abilities
+          CAMLIBS="$prefix/lib/libgphoto2/2.5.34" ./check-abilities
