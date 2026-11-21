@@ -11,14 +11,17 @@ Capture photographs from the original OM SYSTEM OM-5 over USB and process focus 
 | OM-5 shutter and JPEG transfer | Verified using Windows Portable Devices (WPD) | Physical camera test pending |
 | Focus stacking | Windows bridge retrieved a bracket and the camera's composite | Offline stacking of aligned JPEGs available |
 | Lightroom Classic plug-in | Bridge tested with the camera. Import inside Lightroom still needs a catalog test | Plug-in uses gPhoto2 for live capture and needs a capture-capable driver. OM-5 hardware test pending |
-| Lightroom Classic's Start Tethered Capture | Native camera integration unresolved | Same |
-| darktable tethering | Experimental libgphoto2 patch registers the camera. App capture pending | Same |
+| Lightroom Classic's Start Tethered Capture | Adobe omits the OM-5 from its tether list. The project's capture command is under Plug-in Extras | Same |
+| darktable tethering | App detection, shutter and import pending | Patched libgphoto2 built and registered the model. App detection, shutter and import pending |
 | OM Capture | Physical application test pending | Same |
+| Capture One | OM-5 ORF editing supported. Vendor lists tethering and live view as unsupported | Same |
 | Video | Studio processes supplied video files | Same |
 
 The tested camera exposed USB Remote with USB ID `33a2:0138` after a stock settings restore. Ordinary MTP uses `33a2:012f`. The tested body retained its stock firmware.
 
-Developers testing darktable can build the experimental PTP driver in a separate directory. The driver passed a Linux build and registry check for the Remote USB ID and capture capability. [Native driver experiment](native/README.md)
+Developers testing darktable can build the experimental PTP driver in a separate directory. The driver passed Linux and macOS build and registry checks for the Remote USB ID and capture capability. The next test is to load that driver in darktable, select the OM-5 in tethering view, release the shutter there, and verify that a new full-resolution photograph appears in the session. [Native driver experiment](native/README.md) · [macOS build and registry test](https://github.com/hexonMD/om5-usb-tether/actions/runs/44843360360)
+
+For Lightroom Classic, the next Windows test is to run **Capture over USB** from the plug-in and confirm the photos appear in the active catalog. For OM Capture, the first test is whether its camera selector recognizes an original OM-5 in Remote mode. Capture One lists separate capabilities for ORF file support, tethering and live view. [Lightroom plug-in instructions](#lightroom-classic) · [OM Capture compatibility](https://software.omsystem.com/omcapture/en/) · [Capture One camera list](https://support.captureone.com/hc/en-us/articles/360002718118-Supported-Camera-Models-and-RAW-Files-by-Capture-One)
 
 ## Set up the laptop
 
