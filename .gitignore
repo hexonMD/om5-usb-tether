@@ -9,6 +9,11 @@ evidence/
 firmware/
 captures/
 probe-*/
+om5-private*/
+original.csv
+remote.csv
+body.json
+restore-submitted
 *.bin
 *.log
 *.orf

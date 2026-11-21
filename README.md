@@ -2,6 +2,8 @@
 
 Capture photographs from the original OM SYSTEM OM-5 over USB and process focus stacks on a laptop. On a physical OM-5 running body firmware 1.2, one shutter request from the Windows bridge downloaded eight 5184 × 3888 bracket frames and the camera's finished focus-stacked JPEG. All nine originals remained on the SD card.
 
+**Start here if your camera offers Storage, MTP, and Webcam.** USB Remote must first be enabled by backing up your camera's current settings over Wi-Fi, changing its saved USB preference, and restoring the edited copy to the same body. The step-by-step guide includes the setup commands for Windows and macOS, verification, and how to get the USB selection menu back. [Enable USB Remote on the original OM-5](docs/enable-usb-remote.md)
+
 ## Camera and software compatibility
 
 | Workflow | Windows | macOS |
@@ -14,7 +16,7 @@ Capture photographs from the original OM SYSTEM OM-5 over USB and process focus 
 | OM Capture | Physical application test pending | Same |
 | Video | Studio processes supplied video files | Same |
 
-The tested camera exposed USB Remote with USB ID `33a2:0138` after a stock settings restore. Ordinary MTP exposes a different interface. This project currently assumes the body is already in USB Remote. A reproducible first-time setup for other owners is still needed. Firmware flashing was unnecessary for the tested body.
+The tested camera exposed USB Remote with USB ID `33a2:0138` after a stock settings restore. Ordinary MTP uses `33a2:012f`. The tested body retained its stock firmware.
 
 ## Set up the laptop
 
