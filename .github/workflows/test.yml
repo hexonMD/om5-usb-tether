@@ -1,0 +1,20 @@
+name: Offline camera tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  studio:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -v
+      - run: python generate_samples.py
+      - run: python jewelry_studio.py sample --output results
